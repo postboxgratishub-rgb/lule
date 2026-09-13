@@ -5,6 +5,7 @@ dist/
 coverage/
 .expo/
 web-build/
+.vercel/
 
 # Environment and secrets
 .env
