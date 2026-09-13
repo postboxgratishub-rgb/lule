@@ -5,6 +5,7 @@ import { schoolFormSchema, studentProfileFormSchema } from "@/lib/validation";
 describe("school input validation", () => {
   it("normalizes the unique school code and empty optional values", () => {
     const parsed = schoolFormSchema.parse({
+      id: null,
       name: "  Greenwood Public School ",
       code: " gps-01 ",
       address: "",
@@ -15,6 +16,7 @@ describe("school input validation", () => {
     });
 
     expect(parsed.name).toBe("Greenwood Public School");
+    expect(parsed.id).toBeUndefined();
     expect(parsed.code).toBe("GPS-01");
     expect(parsed.address).toBeNull();
     expect(parsed.city).toBe("Bengaluru");

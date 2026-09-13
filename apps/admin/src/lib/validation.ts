@@ -10,7 +10,10 @@ const optionalText = (max: number) =>
 
 export const schoolFormSchema = z.object({
   id: z.preprocess(
-    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    (value) =>
+      value == null || (typeof value === "string" && value.trim() === "")
+        ? undefined
+        : value,
     z.uuid().optional(),
   ),
   name: z.string().trim().min(2, "Enter the school name.").max(200),
