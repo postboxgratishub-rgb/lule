@@ -35,6 +35,23 @@ describe("school input validation", () => {
       }).success,
     ).toBe(false);
   });
+
+  it.each(["-GPS", "_GPS"])(
+    "rejects a code that starts with a separator: %s",
+    (code) => {
+      expect(
+        schoolFormSchema.safeParse({
+          name: "Valid School",
+          code,
+          address: "",
+          city: "",
+          state: "",
+          contact_name: "",
+          contact_phone: "",
+        }).success,
+      ).toBe(false);
+    },
+  );
 });
 
 describe("student profile validation", () => {

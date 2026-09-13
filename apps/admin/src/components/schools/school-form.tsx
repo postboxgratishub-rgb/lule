@@ -34,6 +34,8 @@ export function SchoolForm({ school }: { school?: School }) {
             name="name"
             defaultValue={school?.name}
             placeholder="Greenwood Public School"
+            maxLength={200}
+            aria-invalid={fieldError("name") ? true : undefined}
             aria-describedby={fieldError("name") ? "school-name-error" : undefined}
             required
           />
@@ -54,6 +56,8 @@ export function SchoolForm({ school }: { school?: School }) {
             defaultValue={school?.code}
             placeholder="GPS-01"
             autoCapitalize="characters"
+            maxLength={32}
+            aria-invalid={fieldError("code") ? true : undefined}
             aria-describedby={fieldError("code") ? "school-code-error" : undefined}
             required
           />
@@ -74,7 +78,15 @@ export function SchoolForm({ school }: { school?: School }) {
           name="address"
           defaultValue={school?.address ?? ""}
           placeholder="Street and locality"
+          maxLength={500}
+          aria-invalid={fieldError("address") ? true : undefined}
+          aria-describedby={fieldError("address") ? "school-address-error" : undefined}
         />
+        {fieldError("address") && (
+          <p className="field-error" id="school-address-error">
+            {fieldError("address")}
+          </p>
+        )}
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
@@ -86,7 +98,15 @@ export function SchoolForm({ school }: { school?: School }) {
             id="school-city"
             name="city"
             defaultValue={school?.city ?? ""}
+            maxLength={100}
+            aria-invalid={fieldError("city") ? true : undefined}
+            aria-describedby={fieldError("city") ? "school-city-error" : undefined}
           />
+          {fieldError("city") && (
+            <p className="field-error" id="school-city-error">
+              {fieldError("city")}
+            </p>
+          )}
         </div>
         <div>
           <label className="field-label" htmlFor="school-state">
@@ -97,7 +117,15 @@ export function SchoolForm({ school }: { school?: School }) {
             id="school-state"
             name="state"
             defaultValue={school?.state ?? ""}
+            maxLength={100}
+            aria-invalid={fieldError("state") ? true : undefined}
+            aria-describedby={fieldError("state") ? "school-state-error" : undefined}
           />
+          {fieldError("state") && (
+            <p className="field-error" id="school-state-error">
+              {fieldError("state")}
+            </p>
+          )}
         </div>
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
@@ -110,7 +138,17 @@ export function SchoolForm({ school }: { school?: School }) {
             id="contact-name"
             name="contact_name"
             defaultValue={school?.contact_name ?? ""}
+            maxLength={150}
+            aria-invalid={fieldError("contact_name") ? true : undefined}
+            aria-describedby={
+              fieldError("contact_name") ? "contact-name-error" : undefined
+            }
           />
+          {fieldError("contact_name") && (
+            <p className="field-error" id="contact-name-error">
+              {fieldError("contact_name")}
+            </p>
+          )}
         </div>
         <div>
           <label className="field-label" htmlFor="contact-phone">
@@ -122,7 +160,17 @@ export function SchoolForm({ school }: { school?: School }) {
             name="contact_phone"
             type="tel"
             defaultValue={school?.contact_phone ?? ""}
+            maxLength={30}
+            aria-invalid={fieldError("contact_phone") ? true : undefined}
+            aria-describedby={
+              fieldError("contact_phone") ? "contact-phone-error" : undefined
+            }
           />
+          {fieldError("contact_phone") && (
+            <p className="field-error" id="contact-phone-error">
+              {fieldError("contact_phone")}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex justify-end border-t border-slate-100 pt-5">

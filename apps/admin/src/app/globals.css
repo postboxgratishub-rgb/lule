@@ -54,6 +54,10 @@ body {
     @apply block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-ink-950 shadow-sm transition placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-100;
   }
 
+  .field-input[aria-invalid="true"] {
+    @apply border-red-400 hover:border-red-500 focus:border-red-500 focus:ring-red-100;
+  }
+
   .field-error {
     @apply mt-1.5 text-xs font-medium text-red-600;
   }

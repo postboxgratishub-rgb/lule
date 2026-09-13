@@ -22,7 +22,10 @@ export const schoolFormSchema = z.object({
     .trim()
     .min(2, "Use at least 2 characters.")
     .max(32)
-    .regex(/^[A-Za-z0-9_-]+$/, "Use letters, numbers, hyphens, or underscores only.")
+    .regex(
+      /^[A-Za-z0-9][A-Za-z0-9_-]*$/,
+      "Start with a letter or number, then use letters, numbers, hyphens, or underscores.",
+    )
     .transform((value) => value.toUpperCase()),
   address: optionalText(500),
   city: optionalText(100),
