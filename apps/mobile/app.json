@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "100-Day Learning Challenge",
+    "slug": "100-day-learning-challenge",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "hundreddays",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.learningfoundation.hundreddays",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F766E"
+      }
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.learningfoundation.hundreddays"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

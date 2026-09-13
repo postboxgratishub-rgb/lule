@@ -1,0 +1,27 @@
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+coverage/
+.expo/
+web-build/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# TypeScript
+*.tsbuildinfo
