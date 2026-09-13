@@ -6,8 +6,9 @@
     "orientation": "portrait",
     "scheme": "hundreddays",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router"
+    ],
     "experiments": {
       "typedRoutes": true
     },
@@ -23,6 +24,13 @@
     },
     "web": {
       "bundler": "metro"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7638fcde-5e3c-4fbe-9935-de20bd8d5625"
+      }
+    },
+    "owner": "lule3648"
   }
 }
