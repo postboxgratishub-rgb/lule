@@ -201,6 +201,9 @@ function TrackedPlayer({
       // the unsaved media time so a later heartbeat can retry it without double
       // counting segments that were already persisted.
       if (terminal) {
+        // The server has rejected this watch session permanently. Continuing
+        // playback would look successful while every later heartbeat is lost.
+        player.pause();
         sessionStarted.current = false;
         sessionEnded.current = true;
       } else {
@@ -213,7 +216,7 @@ function TrackedPlayer({
       }
       return { snapshot: null, queued: !terminal };
     }
-  }, [acceptSnapshot, studentId, video.id]);
+  }, [acceptSnapshot, player, studentId, video.id]);
 
   const flush = useCallback((isFinal = false) => {
     const positionSeconds = Math.max(0, player.currentTime);
