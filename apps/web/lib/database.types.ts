@@ -330,6 +330,7 @@ export type Database = {
           p_session_id: string;
           p_device_type?: string;
           p_position_seconds?: number;
+          p_expected_student_id?: string;
         };
         Returns: Json;
       };
@@ -342,11 +343,12 @@ export type Database = {
           p_watched_delta_seconds: number;
           p_device_type?: string;
           p_is_final?: boolean;
+          p_expected_student_id?: string;
         };
         Returns: Json;
       };
       mark_video_complete: {
-        Args: { p_video_id: string };
+        Args: { p_video_id: string; p_expected_student_id?: string };
         Returns: Json;
       };
     };

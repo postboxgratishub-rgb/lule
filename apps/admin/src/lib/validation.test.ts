@@ -153,6 +153,17 @@ describe("challenge content validation", () => {
     },
   );
 
+  it("accepts a Cloudflare customer-code/video-id playback locator", () => {
+    expect(
+      videoFormSchema.safeParse({
+        ...baseVideo,
+        video_source_type: "cloudflare_stream",
+        video_url: "",
+        playback_id: "customer-code/video-id",
+      }).success,
+    ).toBe(true);
+  });
+
   it("accepts a valid external video and normalizes optional fields", () => {
     const parsed = videoFormSchema.parse({
       ...baseVideo,

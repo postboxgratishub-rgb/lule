@@ -1,8 +1,11 @@
 import type { ProgressRpcResult } from "@/lib/challenge/types";
 import {
   appendProgressEvent,
+  isTerminalProgressQueueError,
+  nextProcessableProgressEvent,
   progressEventKey,
   removeProgressEvent,
+  removeProgressSession,
   type QueuedProgressEvent,
 } from "@/lib/challenge/progress-events";
 import { parseProgressRpcResult } from "@/lib/challenge/progress-result";
@@ -14,6 +17,10 @@ const QUEUE_EVENT = "learning-progress-queued";
 let memoryQueue: QueuedProgressEvent[] = [];
 const drainPromises = new Map<string, Promise<ProgressRpcResult[]>>();
 const startedSessions = new Set<string>();
+
+function progressSessionKey(studentId: string, sessionId: string): string {
+  return `${studentId}:${sessionId}`;
+}
 
 function browserStorage(): Storage | null {
   if (typeof window === "undefined") return null;
@@ -88,23 +95,27 @@ export function queueProgressEvent(event: QueuedProgressEvent): void {
 }
 
 async function ensureSessionStarted(event: QueuedProgressEvent): Promise<void> {
-  if (startedSessions.has(event.sessionId)) return;
+  const key = progressSessionKey(event.studentId, event.sessionId);
+  if (startedSessions.has(key)) return;
   const supabase = createClient();
   const { error } = await supabase.rpc("start_video_session", {
     p_video_id: event.videoId,
     p_session_id: event.sessionId,
     p_device_type: event.deviceType,
     p_position_seconds: event.startPositionSeconds,
+    p_expected_student_id: event.studentId,
   });
   if (error) throw new Error(error.message);
-  startedSessions.add(event.sessionId);
+  startedSessions.add(key);
 }
 
 export async function startProgressSession({
+  studentId,
   videoId,
   sessionId,
   positionSeconds,
 }: {
+  studentId: string;
   videoId: string;
   sessionId: string;
   positionSeconds: number;
@@ -115,35 +126,65 @@ export async function startProgressSession({
     p_session_id: sessionId,
     p_device_type: "web",
     p_position_seconds: positionSeconds,
+    p_expected_student_id: studentId,
   });
   if (error) throw new Error(error.message);
-  startedSessions.add(sessionId);
+  startedSessions.add(progressSessionKey(studentId, sessionId));
   return parseProgressRpcResult(data);
 }
 
 async function drainQueue(studentId: string): Promise<ProgressRpcResult[]> {
   const results: ProgressRpcResult[] = [];
+  const blockedSessions = new Set<string>();
+  let firstRetryableError: Error | null = null;
 
   while (true) {
-    const event = readProgressQueue().find((item) => item.studentId === studentId);
-    if (!event) return results;
+    const event = nextProcessableProgressEvent(
+      readProgressQueue(),
+      studentId,
+      blockedSessions,
+    );
+    if (!event) {
+      if (firstRetryableError) throw firstRetryableError;
+      return results;
+    }
 
-    await ensureSessionStarted(event);
-    const supabase = createClient();
-    const { data, error } = await supabase.rpc("record_video_progress", {
-      p_video_id: event.videoId,
-      p_session_id: event.sessionId,
-      p_sequence: event.sequence,
-      p_position_seconds: event.positionSeconds,
-      p_watched_delta_seconds: event.watchedDeltaSeconds,
-      p_device_type: event.deviceType,
-      p_is_final: event.isFinal,
-    });
+    try {
+      await ensureSessionStarted(event);
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("record_video_progress", {
+        p_video_id: event.videoId,
+        p_session_id: event.sessionId,
+        p_sequence: event.sequence,
+        p_position_seconds: event.positionSeconds,
+        p_watched_delta_seconds: event.watchedDeltaSeconds,
+        p_device_type: event.deviceType,
+        p_is_final: event.isFinal,
+        p_expected_student_id: event.studentId,
+      });
 
-    if (error) throw new Error(error.message);
-    const result = parseProgressRpcResult(data);
-    results.push(result);
-    writeProgressQueue(removeProgressEvent(readProgressQueue(), event));
+      if (error) throw new Error(error.message);
+      const result = parseProgressRpcResult(data);
+      results.push(result);
+      writeProgressQueue(removeProgressEvent(readProgressQueue(), event));
+    } catch (error) {
+      if (isTerminalProgressQueueError(error)) {
+        writeProgressQueue(
+          removeProgressSession(
+            readProgressQueue(),
+            event.studentId,
+            event.sessionId,
+          ),
+        );
+        startedSessions.delete(
+          progressSessionKey(event.studentId, event.sessionId),
+        );
+      } else {
+        blockedSessions.add(event.sessionId);
+        firstRetryableError ??=
+          error instanceof Error ? error : new Error(String(error));
+      }
+    }
   }
 }
 
@@ -158,10 +199,14 @@ export function drainProgressQueue(studentId: string): Promise<ProgressRpcResult
   return pending;
 }
 
-export async function markVideoComplete(videoId: string): Promise<ProgressRpcResult> {
+export async function markVideoComplete(
+  videoId: string,
+  studentId: string,
+): Promise<ProgressRpcResult> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("mark_video_complete", {
     p_video_id: videoId,
+    p_expected_student_id: studentId,
   });
   if (error) throw new Error(error.message);
   return parseProgressRpcResult(data);

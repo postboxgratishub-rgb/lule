@@ -228,7 +228,7 @@ create table if not exists private.video_progress_guards (
   constraint video_progress_guards_progress_fkey foreign key (student_id, video_id)
     references public.video_progress (student_id, video_id) on delete cascade,
   constraint video_progress_guards_credit_valid check (
-    watch_credit_seconds between 0 and 1800
+    watch_credit_seconds between 0 and 43200
   )
 );
 
@@ -246,7 +246,7 @@ create table if not exists private.watch_session_guards (
     client_session_id
   ) references public.watch_sessions (student_id, client_session_id) on delete cascade,
   constraint watch_session_guards_credit_valid check (
-    watch_credit_seconds between 0 and 1800
+    watch_credit_seconds between 0 and 43200
   )
 );
 
@@ -877,7 +877,8 @@ create or replace function public.start_video_session(
   p_video_id uuid,
   p_session_id uuid,
   p_device_type text default 'web',
-  p_position_seconds numeric default 0
+  p_position_seconds numeric default 0,
+  p_expected_student_id uuid default null
 )
 returns jsonb
 language plpgsql
@@ -895,6 +896,13 @@ declare
   existing_session public.watch_sessions;
 begin
   student := private.require_student_profile_id();
+
+  if p_expected_student_id is not null
+    and student <> p_expected_student_id
+  then
+    raise exception 'Authenticated student does not match expected_student_id'
+      using errcode = '42501';
+  end if;
 
   if p_session_id is null then
     raise exception 'session_id is required'
@@ -1039,7 +1047,8 @@ create or replace function public.record_video_progress(
   p_position_seconds numeric,
   p_watched_delta_seconds numeric,
   p_device_type text default 'web',
-  p_is_final boolean default false
+  p_is_final boolean default false,
+  p_expected_student_id uuid default null
 )
 returns jsonb
 language plpgsql
@@ -1063,6 +1072,13 @@ declare
   current_clock timestamptz := clock_timestamp();
 begin
   student := private.require_student_profile_id();
+
+  if p_expected_student_id is not null
+    and student <> p_expected_student_id
+  then
+    raise exception 'Authenticated student does not match expected_student_id'
+      using errcode = '42501';
+  end if;
 
   if p_session_id is null then
     raise exception 'session_id is required'
@@ -1193,9 +1209,11 @@ begin
 
   -- The global credit is shared by every device/session for this video. It caps
   -- accepted media time at the supported 2x playback speed and carries fractional
-  -- credit without granting a repeatable per-request jitter allowance.
+  -- credit without granting a repeatable per-request jitter allowance. The bucket
+  -- can retain at least one full supported video (up to 12 hours), so an offline or
+  -- native-fullscreen interval is not truncated by a fixed short-session ceiling.
   accrued_credit := least(
-    1800.000,
+    greatest(1800.000, video_record.duration_seconds::numeric),
     guard_record.watch_credit_seconds
       + greatest(
           0,
@@ -1203,7 +1221,7 @@ begin
         )
   );
   accrued_session_credit := least(
-    1800.000,
+    greatest(1800.000, video_record.duration_seconds::numeric),
     session_guard_record.watch_credit_seconds
       + greatest(
           0,
@@ -1255,7 +1273,10 @@ begin
 end;
 $$;
 
-create or replace function public.mark_video_complete(p_video_id uuid)
+create or replace function public.mark_video_complete(
+  p_video_id uuid,
+  p_expected_student_id uuid default null
+)
 returns jsonb
 language plpgsql
 security definer
@@ -1270,6 +1291,13 @@ declare
   calculated_percentage numeric(5, 2);
 begin
   student := private.require_student_profile_id();
+
+  if p_expected_student_id is not null
+    and student <> p_expected_student_id
+  then
+    raise exception 'Authenticated student does not match expected_student_id'
+      using errcode = '42501';
+  end if;
 
   select v.*
   into video_record
@@ -1639,18 +1667,18 @@ revoke all on function private.build_progress_payload(uuid, uuid, integer) from 
 revoke all on function private.audit_content_change() from public, anon, authenticated;
 revoke all on function private.refresh_progress_after_video_change() from public, anon, authenticated;
 
-revoke all on function public.start_video_session(uuid, uuid, text, numeric) from public, anon, authenticated;
-revoke all on function public.record_video_progress(uuid, uuid, integer, numeric, numeric, text, boolean) from public, anon, authenticated;
-revoke all on function public.mark_video_complete(uuid) from public, anon, authenticated;
+revoke all on function public.start_video_session(uuid, uuid, text, numeric, uuid) from public, anon, authenticated;
+revoke all on function public.record_video_progress(uuid, uuid, integer, numeric, numeric, text, boolean, uuid) from public, anon, authenticated;
+revoke all on function public.mark_video_complete(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.reorder_day_videos(uuid, uuid[]) from public, anon, authenticated;
 revoke all on function public.upsert_day_videos(uuid, jsonb) from public, anon, authenticated;
 
 grant execute on function private.current_profile_id() to authenticated, service_role;
 grant execute on function private.program_date() to authenticated, service_role;
 grant execute on function private.is_video_available(uuid) to authenticated, service_role;
-grant execute on function public.start_video_session(uuid, uuid, text, numeric) to authenticated;
-grant execute on function public.record_video_progress(uuid, uuid, integer, numeric, numeric, text, boolean) to authenticated;
-grant execute on function public.mark_video_complete(uuid) to authenticated;
+grant execute on function public.start_video_session(uuid, uuid, text, numeric, uuid) to authenticated;
+grant execute on function public.record_video_progress(uuid, uuid, integer, numeric, numeric, text, boolean, uuid) to authenticated;
+grant execute on function public.mark_video_complete(uuid, uuid) to authenticated;
 grant execute on function public.reorder_day_videos(uuid, uuid[]) to authenticated;
 grant execute on function public.upsert_day_videos(uuid, jsonb) to authenticated;
 
@@ -1693,12 +1721,12 @@ comment on table public.video_progress is 'Authoritative cross-device playback p
 comment on table public.watch_sessions is 'Per-device playback sessions updated only through progress RPCs.';
 comment on table public.daily_progress is 'Server-recalculated learning totals per student/day.';
 comment on table public.audit_logs is 'Identifiable admin mutations to managed content.';
-comment on function public.start_video_session(uuid, uuid, text, numeric) is
-  'Starts an idempotent client session and returns the canonical video progress payload.';
-comment on function public.record_video_progress(uuid, uuid, integer, numeric, numeric, text, boolean) is
-  'Records a sequence-idempotent heartbeat; media time is globally capped at 2x wall-clock.';
-comment on function public.mark_video_complete(uuid) is
-  'Marks a video complete only after the configured server-side watch threshold is met.';
+comment on function public.start_video_session(uuid, uuid, text, numeric, uuid) is
+  'Starts an idempotent client session. An optional expected student profile prevents an in-flight request from being attributed after an account switch.';
+comment on function public.record_video_progress(uuid, uuid, integer, numeric, numeric, text, boolean, uuid) is
+  'Records a sequence-idempotent heartbeat, rejects an optional expected-student mismatch, and caps media time globally at 2x wall-clock.';
+comment on function public.mark_video_complete(uuid, uuid) is
+  'Marks a video complete after the server-side threshold and rejects an optional expected-student mismatch.';
 comment on function public.reorder_day_videos(uuid, uuid[]) is
   'Admin-only atomic reorder; the array must contain every video in the day exactly once.';
 comment on function public.upsert_day_videos(uuid, jsonb) is

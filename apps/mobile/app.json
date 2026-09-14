@@ -3,11 +3,12 @@
     "name": "100-Day Learning Challenge",
     "slug": "100-day-learning-challenge",
     "version": "0.1.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "scheme": "hundreddays",
     "userInterfaceStyle": "light",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

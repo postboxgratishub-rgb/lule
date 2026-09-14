@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   acceptedPlaybackDelta,
   appendProgressEvent,
+  isTerminalProgressQueueError,
+  nextProcessableProgressEvent,
   removeProgressEvent,
+  removeProgressSession,
+  splitProgressDelta,
   type QueuedProgressEvent,
 } from "@/lib/challenge/progress-events";
 
@@ -57,5 +61,46 @@ describe("playback progress events", () => {
     const queue = appendProgressEvent(appendProgressEvent([], event), replacement);
     expect(queue).toEqual([replacement]);
     expect(removeProgressEvent(queue, event)).toEqual([]);
+  });
+
+  it("splits delayed playback into server-sized monotonic batches", () => {
+    expect(splitProgressDelta(95)).toEqual([30, 30, 30, 5]);
+    expect(splitProgressDelta(0.9)).toEqual([0]);
+  });
+
+  it("continues with another video when one session is temporarily blocked", () => {
+    const blocked = { ...event, sessionId: "blocked", videoId: "video-blocked" };
+    const ready = {
+      ...event,
+      sessionId: "ready",
+      videoId: "video-ready",
+      queuedAt: "2026-09-14T00:00:01.000Z",
+    };
+    const queue = [blocked, ready];
+
+    expect(nextProcessableProgressEvent(queue, event.studentId, new Set(["blocked"]))).toBe(
+      ready,
+    );
+    expect(removeProgressSession(queue, event.studentId, "blocked")).toEqual([ready]);
+  });
+
+  it.each([
+    "Watch session has already ended",
+    "Watch session belongs to another video",
+    "Watch session not found; call start_video_session first",
+    "Video is not available",
+    "position_seconds exceeds video duration",
+    "device_type is invalid",
+  ])("drops a permanently invalid session after: %s", (message) => {
+    expect(isTerminalProgressQueueError(new Error(message))).toBe(true);
+  });
+
+  it.each([
+    "An authenticated student profile is required",
+    "Authenticated student does not match expected_student_id",
+    "JWT expired",
+    "Failed to fetch",
+  ])("retains a queue that can recover after: %s", (message) => {
+    expect(isTerminalProgressQueueError(new Error(message))).toBe(false);
   });
 });

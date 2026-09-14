@@ -205,7 +205,7 @@ function VideoSlotEditor({
               </p>
             ) : (
               <p className="mt-1.5 text-xs leading-5 text-ink-500" id={`${id("playback_id")}-help`}>
-                Leave empty when using an external URL.
+                Cloudflare accepts customer-code/video-id. Leave empty for an external URL.
               </p>
             )}
           </div>

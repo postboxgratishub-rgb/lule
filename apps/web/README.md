@@ -15,7 +15,7 @@ and the same Supabase source of truth as the mobile app and admin dashboard.
 - In-platform custom HTML5 player with play/pause, seek, volume, playback speed,
   fullscreen, duration, loading, retry, previous/next, and watch-again controls
 - Provider-neutral playback resolution for external/Google Drive, Cloudflare
-  Stream, and Mux records
+  Stream, and Mux records; HLS uses native browser support or `hls.js`
 - Cross-device resume from the canonical Supabase playback position
 - Server-authoritative completion eligibility and `Mark as complete` RPC flow
 - Twelve-second playback heartbeats plus pause, end, visibility, navigation, and
@@ -62,7 +62,7 @@ Cloudflare Stream and Mux playback IDs resolve to HLS streams.
 
 ## Supabase Auth URL configuration
 
-Add the local and deployed callback origins in **Authentication → URL
+Add the local and deployed callback origins in **Authentication -> URL
 Configuration**:
 
 - `http://localhost:3000/auth/callback`

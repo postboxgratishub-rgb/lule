@@ -200,20 +200,34 @@ select extensions.has_column('public', 'videos', 'playback_id', 'provider playba
 select extensions.has_function(
   'public',
   'start_video_session',
-  array['uuid', 'uuid', 'text', 'numeric'],
+  array['uuid', 'uuid', 'text', 'numeric', 'uuid'],
   'start session RPC exists'
 );
 select extensions.has_function(
   'public',
   'record_video_progress',
-  array['uuid', 'uuid', 'integer', 'numeric', 'numeric', 'text', 'boolean'],
+  array['uuid', 'uuid', 'integer', 'numeric', 'numeric', 'text', 'boolean', 'uuid'],
   'heartbeat RPC exists'
 );
 select extensions.has_function(
   'public',
   'mark_video_complete',
-  array['uuid'],
+  array['uuid', 'uuid'],
   'mark complete RPC exists'
+);
+select extensions.is(
+  (
+    select count(*)
+    from regexp_matches(
+      pg_get_functiondef(
+        'public.record_video_progress(uuid,uuid,integer,numeric,numeric,text,boolean,uuid)'::regprocedure
+      ),
+      'greatest\(1800\.000, video_record\.duration_seconds::numeric\)',
+      'g'
+    )
+  ),
+  2::bigint,
+  'global and per-session offline credit caps expand to the supported video duration'
 );
 select extensions.has_function(
   'public',
@@ -279,7 +293,7 @@ select extensions.ok(
 select extensions.ok(
   has_function_privilege(
     'authenticated',
-    'public.record_video_progress(uuid,uuid,integer,numeric,numeric,text,boolean)',
+    'public.record_video_progress(uuid,uuid,integer,numeric,numeric,text,boolean,uuid)',
     'EXECUTE'
   ),
   'authenticated clients can execute the secured heartbeat RPC'
@@ -287,7 +301,7 @@ select extensions.ok(
 select extensions.ok(
   not has_function_privilege(
     'anon',
-    'public.record_video_progress(uuid,uuid,integer,numeric,numeric,text,boolean)',
+    'public.record_video_progress(uuid,uuid,integer,numeric,numeric,text,boolean,uuid)',
     'EXECUTE'
   ),
   'anonymous clients cannot execute the heartbeat RPC'
@@ -432,7 +446,8 @@ select extensions.is(
       '92300000-0000-4000-8000-000000000001',
       '92400000-0000-4000-8000-000000000001',
       'WEB',
-      0
+      0,
+      '92100000-0000-4000-8000-000000000001'
     ) ->> 'watched_seconds'
   )::integer,
   0,
@@ -515,7 +530,8 @@ select extensions.ok(
       20,
       30,
       'web',
-      false
+      false,
+      '92100000-0000-4000-8000-000000000001'
     ) ->> 'accepted_delta_seconds'
   )::integer between 19 and 21,
   'a forged 30-second heartbeat is capped to the supported 2x wall-clock rate'
@@ -584,7 +600,10 @@ select extensions.ok(
 );
 select extensions.ok(
   (
-    public.mark_video_complete('92300000-0000-4000-8000-000000000001')
+    public.mark_video_complete(
+      '92300000-0000-4000-8000-000000000001',
+      '92100000-0000-4000-8000-000000000001'
+    )
       ->> 'completed'
   )::boolean,
   'the explicit mark-complete action persists completion'
@@ -635,6 +654,38 @@ select extensions.is(
 );
 
 reset role;
+select extensions.lives_ok(
+  $$update private.video_progress_guards
+    set watch_credit_seconds = 43200
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and video_id = '92300000-0000-4000-8000-000000000001'$$,
+  'the global guard can retain credit for a full 12-hour supported video'
+);
+select extensions.lives_ok(
+  $$update private.watch_session_guards
+    set watch_credit_seconds = 43200
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and client_session_id = '92400000-0000-4000-8000-000000000001'$$,
+  'the session guard can retain credit for a full 12-hour supported video'
+);
+select extensions.throws_ok(
+  $$update private.video_progress_guards
+    set watch_credit_seconds = 43200.001
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and video_id = '92300000-0000-4000-8000-000000000001'$$,
+  '23514',
+  null,
+  'the global guard rejects credit beyond the maximum supported duration'
+);
+select extensions.throws_ok(
+  $$update private.watch_session_guards
+    set watch_credit_seconds = 43200.001
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and client_session_id = '92400000-0000-4000-8000-000000000001'$$,
+  '23514',
+  null,
+  'the session guard rejects credit beyond the maximum supported duration'
+);
 update private.video_progress_guards
 set watch_credit_seconds = 0,
     credit_updated_at = clock_timestamp()
@@ -858,6 +909,37 @@ select extensions.throws_ok(
   'P0002',
   'Watch session not found; call start_video_session first',
   'a session id cannot be stolen across students'
+);
+select extensions.throws_ok(
+  $$select public.start_video_session(
+      '92300000-0000-4000-8000-000000000001',
+      '92400000-0000-4000-8000-000000000010',
+      'web', 0,
+      '92100000-0000-4000-8000-000000000001'
+    )$$,
+  '42501',
+  'Authenticated student does not match expected_student_id',
+  'a queued session start is rejected after the authenticated account switches'
+);
+select extensions.throws_ok(
+  $$select public.record_video_progress(
+      '92300000-0000-4000-8000-000000000001',
+      '92400000-0000-4000-8000-000000000001',
+      3, 40, 20, 'web', false,
+      '92100000-0000-4000-8000-000000000001'
+    )$$,
+  '42501',
+  'Authenticated student does not match expected_student_id',
+  'a queued heartbeat is rejected after the authenticated account switches'
+);
+select extensions.throws_ok(
+  $$select public.mark_video_complete(
+      '92300000-0000-4000-8000-000000000001',
+      '92100000-0000-4000-8000-000000000001'
+    )$$,
+  '42501',
+  'Authenticated student does not match expected_student_id',
+  'a queued completion is rejected after the authenticated account switches'
 );
 
 -- Admins see all content and learning rows, can manage/reorder content, and

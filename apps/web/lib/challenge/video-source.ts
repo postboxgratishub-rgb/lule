@@ -38,6 +38,12 @@ export function normalizeExternalVideoUrl(value: string): string | null {
   return url.toString();
 }
 
+function hlsMimeType(url: string): string | undefined {
+  return /\.m3u8(?:$|[?#])/i.test(url)
+    ? "application/vnd.apple.mpegurl"
+    : undefined;
+}
+
 function resolvePlaybackId(value: string | null): string | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -54,7 +60,7 @@ export function resolveVideoSource(
 
   if (video.video_source_type === "external_url") {
     return explicitUrl
-      ? { provider: "external_url", url: explicitUrl }
+      ? { provider: "external_url", url: explicitUrl, mimeType: hlsMimeType(explicitUrl) }
       : {
           provider: "external_url",
           url: null,
@@ -63,7 +69,7 @@ export function resolveVideoSource(
   }
 
   if (explicitUrl) {
-    return { provider: video.video_source_type, url: explicitUrl };
+    return { provider: video.video_source_type, url: explicitUrl, mimeType: hlsMimeType(explicitUrl) };
   }
 
   const playbackId = resolvePlaybackId(video.playback_id);
@@ -76,7 +82,7 @@ export function resolveVideoSource(
   }
 
   if (safeHttpUrl(playbackId)) {
-    return { provider: video.video_source_type, url: playbackId };
+    return { provider: video.video_source_type, url: playbackId, mimeType: hlsMimeType(playbackId) };
   }
 
   if (video.video_source_type === "mux") {

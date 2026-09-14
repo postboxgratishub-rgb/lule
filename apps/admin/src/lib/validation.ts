@@ -103,8 +103,8 @@ export const videoFormSchema = z
         .trim()
         .max(512)
         .regex(
-          /^[A-Za-z0-9._-]+$/,
-          "Playback ID can contain letters, numbers, dots, hyphens, and underscores.",
+          /^[A-Za-z0-9._/-]+$/,
+          "Playback ID can contain letters, numbers, dots, slashes, hyphens, and underscores.",
         )
         .nullable(),
     ),

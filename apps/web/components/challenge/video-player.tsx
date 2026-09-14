@@ -1,5 +1,6 @@
 "use client";
 
+import Hls from "hls.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -17,6 +18,7 @@ import { Button, buttonClassName } from "@/components/ui/button";
 import {
   acceptedPlaybackDelta,
   PROGRESS_HEARTBEAT_SECONDS,
+  splitProgressDelta,
   type ProgressSyncReason,
 } from "@/lib/challenge/progress-events";
 import {
@@ -215,7 +217,7 @@ export function VideoPlayer({
     (reason: ProgressSyncReason, isFinal: boolean): boolean => {
       const element = videoRef.current;
       const session = sessionRef.current;
-      if (!element || !session) return false;
+      if (!element || !session || session.finalized) return false;
 
       const delta = Math.max(0, pendingDeltaRef.current);
       const transferableDelta = Math.floor(delta);
@@ -226,25 +228,29 @@ export function VideoPlayer({
       const positionChanged = Math.abs(position - session.lastQueuedPosition) >= 0.5;
       if (transferableDelta === 0 && !positionChanged && !isFinal) return false;
 
-      session.sequence += 1;
+      const chunks = splitProgressDelta(transferableDelta);
       session.lastQueuedPosition = position;
-      if (isFinal) session.finalized = true;
       pendingDeltaRef.current = isFinal ? 0 : delta - transferableDelta;
       setPendingSeconds(pendingDeltaRef.current);
 
-      queueProgressEvent({
-        studentId,
-        videoId: video.id,
-        sessionId: session.id,
-        sequence: session.sequence,
-        positionSeconds: Math.round(position * 1_000) / 1_000,
-        watchedDeltaSeconds: transferableDelta,
-        deviceType: "web",
-        isFinal,
-        startPositionSeconds: Math.round(session.startPosition * 1_000) / 1_000,
-        reason,
-        queuedAt: new Date().toISOString(),
-      });
+      for (const [index, watchedDeltaSeconds] of chunks.entries()) {
+        const finalChunk = isFinal && index === chunks.length - 1;
+        session.sequence += 1;
+        queueProgressEvent({
+          studentId,
+          videoId: video.id,
+          sessionId: session.id,
+          sequence: session.sequence,
+          positionSeconds: Math.round(position * 1_000) / 1_000,
+          watchedDeltaSeconds,
+          deviceType: "web",
+          isFinal: finalChunk,
+          startPositionSeconds: Math.round(session.startPosition * 1_000) / 1_000,
+          reason,
+          queuedAt: new Date().toISOString(),
+        });
+        if (finalChunk) session.finalized = true;
+      }
       setSyncStatus("queued");
       return true;
     },
@@ -282,6 +288,7 @@ export function VideoPlayer({
     session.startAttempted = true;
     setSyncStatus("syncing");
     void startProgressSession({
+      studentId,
       videoId: video.id,
       sessionId: session.id,
       positionSeconds: session.startPosition,
@@ -295,7 +302,51 @@ export function VideoPlayer({
         setSyncStatus("queued");
         setSyncError(friendlyProgressError(error));
       });
-  }, [applyResult, ensureSession, video.id]);
+  }, [applyResult, ensureSession, studentId, video.id]);
+
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element || !source.url) return;
+
+    setMediaError(source.error ?? null);
+    setIsLoading(true);
+    if (source.mimeType !== "application/vnd.apple.mpegurl") {
+      element.src = source.url;
+      element.load();
+      return () => {
+        element.removeAttribute("src");
+        element.load();
+      };
+    }
+
+    if (element.canPlayType("application/vnd.apple.mpegurl")) {
+      element.src = source.url;
+      element.load();
+      return () => {
+        element.removeAttribute("src");
+        element.load();
+      };
+    }
+
+    if (!Hls.isSupported()) {
+      const timer = window.setTimeout(() => {
+        setIsLoading(false);
+        setMediaError("This browser cannot play HLS video streams.");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const hls = new Hls({ enableWorker: true });
+    hls.loadSource(source.url);
+    hls.attachMedia(element);
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (!data.fatal) return;
+      setIsLoading(false);
+      setMediaError("The HLS stream could not be loaded. Check the provider playback settings and retry.");
+    });
+
+    return () => hls.destroy();
+  }, [retryKey, source.error, source.mimeType, source.url]);
 
   useEffect(() => {
     const heartbeat = window.setInterval(() => {
@@ -444,7 +495,6 @@ export function VideoPlayer({
     setMediaError(source.error ?? null);
     setIsLoading(true);
     setRetryKey((value) => value + 1);
-    requestAnimationFrame(() => videoRef.current?.load());
   };
 
   const watchAgain = async () => {
@@ -471,7 +521,7 @@ export function VideoPlayer({
     await syncQueuedProgress();
 
     try {
-      const result = await markVideoComplete(video.id);
+      const result = await markVideoComplete(video.id, studentId);
       applyResult(result);
       setCompletionMessage("Video completed. Your daily progress is up to date.");
       router.refresh();
@@ -498,7 +548,6 @@ export function VideoPlayer({
               key={`${source.url}-${retryKey}`}
               ref={videoRef}
               className="h-full w-full object-contain"
-              src={source.url}
               poster={video.thumbnail_url ?? undefined}
               preload="metadata"
               playsInline
@@ -528,7 +577,7 @@ export function VideoPlayer({
                 setIsLoading(false);
                 setMediaError(
                   source.mimeType === "application/vnd.apple.mpegurl"
-                    ? "This browser could not play the configured HLS stream. Add a browser-compatible MP4 URL in the video settings or try another browser."
+                    ? "The configured HLS stream could not be loaded. Check the provider settings or retry."
                     : "The video could not be loaded. Check your connection or ask an administrator to verify its URL.",
                 );
               }}

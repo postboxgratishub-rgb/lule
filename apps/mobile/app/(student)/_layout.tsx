@@ -19,7 +19,7 @@ export default function StudentLayout() {
     authLoading: isLoading,
     hasSession: Boolean(session),
     profileLoading: profile.isLoading,
-    profileError: profile.isError,
+    profileError: profile.isError && !profile.data,
     role: profile.data?.role,
   });
 
@@ -79,6 +79,7 @@ export default function StudentLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="days" options={{ href: null }} />
     </Tabs>
   );
 }
