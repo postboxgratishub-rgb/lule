@@ -20,10 +20,11 @@ npx supabase db push
 npx supabase migration list --linked
 ```
 
-The push must include both the Phase 1 foundation migration and the Phase 2/3
-content/progress migration. The latter also configures the required Realtime
-publication. Do not run `seed.sql` in production: it contains deterministic local
-identities, sample content, and sample progress.
+The push must include the Phase 1 foundation migration, the Phase 2/3
+content/progress migration, and the additive content-refresh optimization. The
+Phase 2/3 migration also configures the required Realtime publication. Do not run
+`seed.sql` in production: it contains deterministic local identities, sample
+content, and sample progress.
 
 Create the first production administrator through a controlled operator workflow.
 The public registration path always creates a student, by design.
@@ -50,7 +51,7 @@ Run `npx supabase db reset && npx supabase test db` against local or disposable
 staging infrastructure before the push. Do not create pgTAP fixtures in production.
 After the staging deployment, perform controlled smoke checks that:
 
-- both migrations appear in `migration list --linked`;
+- all repository migrations appear in `migration list --linked`;
 - `start_video_session`, `record_video_progress`, and
   `mark_video_complete` are callable by an authenticated test student;
 - direct student writes to progress tables are rejected;

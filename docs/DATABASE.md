@@ -4,6 +4,7 @@ The schema is built in order by:
 
 1. [`20260913000000_phase1_foundation.sql`](../supabase/migrations/20260913000000_phase1_foundation.sql)
 2. [`20260914000000_phase2_content_phase3_video.sql`](../supabase/migrations/20260914000000_phase2_content_phase3_video.sql)
+3. [`20260914183000_optimize_content_progress_refresh.sql`](../supabase/migrations/20260914183000_optimize_content_progress_refresh.sql)
 
 All timestamps are `timestamptz` and stored in UTC. Programme-date decisions use
 the timezone in the singleton `challenge_settings` row, which defaults to
@@ -158,6 +159,12 @@ overlapping. A hidden page or disabled button is never treated as authorization.
 The Phase 2/3 migration idempotently adds `challenge_days`, `videos`,
 `video_progress`, and `daily_progress` to the `supabase_realtime`
 publication. RLS still controls which change rows a subscriber can receive.
+
+The follow-up optimization migration keeps duration-derived video progress
+immediate, ignores no-op content assignments, and defers content-driven daily
+aggregation until the transaction's final state. A multi-video save or reorder
+then performs one set-based refresh per affected day instead of recalculating the
+same cohort once per video row.
 
 ## Development seed
 

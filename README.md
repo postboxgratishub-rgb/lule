@@ -43,7 +43,7 @@ npx supabase start
 npx supabase db reset
 ```
 
-`db reset` applies both repository migrations and the development seed. Read the
+`db reset` applies all repository migrations and the development seed. Read the
 local API URL and public anon key from `npx supabase status`, then create each app's
 environment file:
 
@@ -179,7 +179,7 @@ secrets are not needed for playback and must not be added to client builds.
 3. Add student/admin callback URLs and the `hundreddays://` mobile URLs to the Auth
    redirect allow-list.
 4. Enable email/password auth and production email confirmation as appropriate.
-5. Push both migrations; never run `seed.sql` in production.
+5. Push all migrations; never run `seed.sql` in production.
 6. Create the first administrator through a controlled operator workflow;
    self-registration always creates a student.
 7. Confirm database tests in staging, then deploy web/admin and create a fresh EAS

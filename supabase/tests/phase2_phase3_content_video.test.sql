@@ -170,6 +170,12 @@ values
     true
   );
 
+-- Flush the fixture's deferred content events before progress rows exist, then
+-- restore the production default for the batching assertions below.
+set constraints videos_daily_progress_refresh_deferred immediate;
+set constraints videos_daily_progress_refresh_deferred deferred;
+set local lule.content_progress_refreshed_days = '';
+
 -- Schema, constraints, indexes, and the public RPC surface.
 select extensions.has_table('public', 'challenge_days', 'challenge_days exists');
 select extensions.has_table('public', 'videos', 'videos exists');
@@ -197,6 +203,35 @@ select extensions.col_is_pk('public', 'daily_progress', 'id', 'daily progress id
 select extensions.has_column('public', 'watch_sessions', 'client_session_id', 'client session id is stored');
 select extensions.has_column('public', 'watch_sessions', 'last_sequence', 'heartbeat sequence is stored');
 select extensions.has_column('public', 'videos', 'playback_id', 'provider playback id is stored');
+select extensions.ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger as trigger
+    where trigger.tgrelid = 'public.videos'::regclass
+      and trigger.tgname = 'videos_daily_progress_refresh_deferred'
+      and trigger.tgdeferrable
+      and trigger.tginitdeferred
+      and not trigger.tgisinternal
+  ),
+  'content-driven daily refresh is deferred and transaction-coalesced'
+);
+select extensions.ok(
+  exists (
+    select 1
+    from pg_catalog.pg_trigger as trigger
+    where trigger.tgrelid = 'public.videos'::regclass
+      and trigger.tgname = 'videos_progress_refresh_after_duration_change'
+      and not trigger.tgdeferrable
+      and not trigger.tgisinternal
+  ),
+  'duration changes retain a dedicated immediate progress refresh'
+);
+select extensions.ok(
+  pg_get_functiondef(
+    'private.refresh_daily_progress_after_video_change_deferred()'::regprocedure
+  ) like '%recalculate_daily_progress_for_day%',
+  'the deferred trigger uses the set-based day refresh'
+);
 select extensions.has_function(
   'public',
   'start_video_session',
@@ -1007,6 +1042,8 @@ select extensions.lives_ok(
     where id = '92300000-0000-4000-8000-000000000002'$$,
   'admin can unpublish a required video'
 );
+set constraints videos_daily_progress_refresh_deferred immediate;
+set constraints videos_daily_progress_refresh_deferred deferred;
 select extensions.is(
   (
     select completed
@@ -1017,12 +1054,15 @@ select extensions.is(
   false,
   'daily completion is recalculated when required content is unpublished'
 );
+set local lule.content_progress_refreshed_days = '';
 select extensions.lives_ok(
   $$update public.videos
     set is_published = true
     where id = '92300000-0000-4000-8000-000000000002'$$,
   'admin can republish a required video'
 );
+set constraints videos_daily_progress_refresh_deferred immediate;
+set constraints videos_daily_progress_refresh_deferred deferred;
 select extensions.is(
   (
     select completed
@@ -1033,6 +1073,7 @@ select extensions.is(
   true,
   'daily completion is recalculated when required content is republished'
 );
+set local lule.content_progress_refreshed_days = '';
 select extensions.lives_ok(
   $$select public.reorder_day_videos(
       '92200000-0000-4000-8000-000000000001',
@@ -1044,6 +1085,8 @@ select extensions.lives_ok(
     )$$,
   'admin can atomically reorder all videos in a day'
 );
+set constraints videos_daily_progress_refresh_deferred immediate;
+set constraints videos_daily_progress_refresh_deferred deferred;
 select extensions.is(
   (
     select video_number::integer
@@ -1062,6 +1105,148 @@ select extensions.is(
   3,
   'reorder assigns the last requested position'
 );
+select extensions.is(
+  (
+    select completed
+    from public.daily_progress
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and challenge_day_id = '92200000-0000-4000-8000-000000000001'
+  ),
+  false,
+  'one deferred refresh uses the final order when required slots change'
+);
+set local lule.content_progress_refreshed_days = '';
+
+reset role;
+update public.daily_progress
+set watch_time_seconds = 12345
+where student_id = '92100000-0000-4000-8000-000000000001'
+  and challenge_day_id = '92200000-0000-4000-8000-000000000001';
+set local request.jwt.claim.sub = '92100000-0000-4000-8000-000000000003';
+set local request.jwt.claims = '{"sub":"92100000-0000-4000-8000-000000000003","role":"authenticated"}';
+set local role authenticated;
+
+select extensions.lives_ok(
+  $$update public.videos
+    set is_published = is_published
+    where challenge_day_id = '92200000-0000-4000-8000-000000000001'$$,
+  'a no-op multi-video update is accepted'
+);
+set constraints videos_daily_progress_refresh_deferred immediate;
+set constraints videos_daily_progress_refresh_deferred deferred;
+select extensions.is(
+  (
+    select watch_time_seconds
+    from public.daily_progress
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and challenge_day_id = '92200000-0000-4000-8000-000000000001'
+  ),
+  12345,
+  'a no-op video update does not rewrite daily progress'
+);
+
+set local lule.content_progress_refreshed_days = '';
+select extensions.lives_ok(
+  $$update public.videos
+    set is_published = true
+    where id = '92300000-0000-4000-8000-000000000003'$$,
+  'an actual publication change schedules a daily refresh'
+);
+set constraints videos_daily_progress_refresh_deferred immediate;
+set constraints videos_daily_progress_refresh_deferred deferred;
+select extensions.results_eq(
+  $$
+    select videos_completed::integer, watch_time_seconds, completed
+    from public.daily_progress
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and challenge_day_id = '92200000-0000-4000-8000-000000000001'
+  $$,
+  $$values (1, 84, false)$$,
+  'an actual content change set-wise restores the authoritative daily aggregate'
+);
+set local lule.content_progress_refreshed_days = '';
+
+reset role;
+update public.daily_progress
+set videos_completed = 2,
+    completion_percentage = 100,
+    completed = true,
+    completed_at = now()
+where student_id = '92100000-0000-4000-8000-000000000001'
+  and challenge_day_id = '92200000-0000-4000-8000-000000000001';
+set local request.jwt.claim.sub = '92100000-0000-4000-8000-000000000003';
+set local request.jwt.claims = '{"sub":"92100000-0000-4000-8000-000000000003","role":"authenticated"}';
+set local role authenticated;
+
+update public.videos
+set is_published = false
+where id = '92300000-0000-4000-8000-000000000003';
+update public.videos
+set is_published = true
+where id = '92300000-0000-4000-8000-000000000003';
+set constraints videos_daily_progress_refresh_deferred immediate;
+set constraints videos_daily_progress_refresh_deferred deferred;
+select extensions.results_eq(
+  $$
+    select dp.videos_completed::integer, dp.completed, v.is_published
+    from public.daily_progress as dp
+    cross join public.videos as v
+    where dp.student_id = '92100000-0000-4000-8000-000000000001'
+      and dp.challenge_day_id = '92200000-0000-4000-8000-000000000001'
+      and v.id = '92300000-0000-4000-8000-000000000003'
+  $$,
+  $$values (1, false, true)$$,
+  'multiple video statements coalesce against the transaction final state'
+);
+set local lule.content_progress_refreshed_days = '';
+
+reset role;
+update public.daily_progress
+set watch_time_seconds = 54321
+where student_id = '92100000-0000-4000-8000-000000000001'
+  and challenge_day_id = '92200000-0000-4000-8000-000000000001';
+set local request.jwt.claim.sub = '92100000-0000-4000-8000-000000000003';
+set local request.jwt.claims = '{"sub":"92100000-0000-4000-8000-000000000003","role":"authenticated"}';
+set local role authenticated;
+
+select extensions.lives_ok(
+  $$update public.videos
+    set duration_seconds = 20
+    where id = '92300000-0000-4000-8000-000000000001'$$,
+  'an actual duration change revalidates video progress'
+);
+select extensions.results_eq(
+  $$
+    select last_position_seconds, completion_percentage::text, completed
+    from public.video_progress
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and video_id = '92300000-0000-4000-8000-000000000001'
+  $$,
+  $$values (20, '100.00'::text, true)$$,
+  'duration changes clamp position and recalculate percentage without losing completion'
+);
+select extensions.is(
+  (
+    select watch_time_seconds
+    from public.daily_progress
+    where student_id = '92100000-0000-4000-8000-000000000001'
+      and challenge_day_id = '92200000-0000-4000-8000-000000000001'
+  ),
+  54321,
+  'a duration-only change does not run the unrelated daily aggregate refresh'
+);
+
+reset role;
+do $$
+begin
+  perform private.recalculate_daily_progress_for_day(
+    '92200000-0000-4000-8000-000000000001'
+  );
+end
+$$;
+set local request.jwt.claim.sub = '92100000-0000-4000-8000-000000000003';
+set local request.jwt.claims = '{"sub":"92100000-0000-4000-8000-000000000003","role":"authenticated"}';
+set local role authenticated;
 select extensions.throws_ok(
   $$select public.reorder_day_videos(
       '92200000-0000-4000-8000-000000000001',
