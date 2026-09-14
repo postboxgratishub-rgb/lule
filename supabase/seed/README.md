@@ -24,3 +24,19 @@ Do not use these passwords in a hosted environment.
 The seed contains eleven total Auth users and eleven profiles: one administrator
 and ten students. Self-signups always receive the `student` application role even
 if a caller includes a different role in Auth metadata.
+
+It also creates three published challenge days with ten provider-neutral sample
+videos per day. The videos use public development MP4 URLs and are not intended
+as production curriculum.
+
+The local progress fixtures cover the main dashboard states:
+
+- `student01@example.com` has completed Day 1 and started Day 2.
+- `student02@example.com` is partway through Day 1.
+- `student04@example.com` is ahead, with Days 1 and 2 completed and Day 3 started.
+- `student05@example.com` has incomplete activity from yesterday.
+- The remaining students have not started, which supports empty-state and
+  not-active-today testing.
+
+Every fixture watch row represents accepted playback time; simply opening a
+video does not add any watch seconds.

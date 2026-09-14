@@ -282,8 +282,8 @@ select extensions.throws_ok(
   'even admins cannot assign roles from a client session'
 );
 select extensions.results_eq(
-  $$update public.challenge_settings set total_days = 120 where id = 1 returning total_days::integer$$,
-  $$values (120)$$,
+  $$update public.challenge_settings set total_days = 90 where id = 1 returning total_days::integer$$,
+  $$values (90)$$,
   'an admin can update valid challenge settings'
 );
 select extensions.throws_ok(
