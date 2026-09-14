@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
+import { ProgressSynchronizer } from "@/components/challenge/progress-synchronizer";
 import { StudentShell } from "@/components/layout/student-shell";
 import { getCurrentStudent } from "@/lib/data/current-student";
 
@@ -18,6 +19,7 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
       name={student.profile?.full_name ?? null}
       email={student.authEmail}
     >
+      {student.profile ? <ProgressSynchronizer studentId={student.profile.id} /> : null}
       {children}
     </StudentShell>
   );

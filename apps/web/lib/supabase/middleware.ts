@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 import { getPublicSupabaseEnv } from "@/lib/env";
 
-const PROTECTED_PATHS = ["/dashboard", "/profile"];
+const PROTECTED_PATHS = ["/dashboard", "/challenge", "/profile"];
 const GUEST_ONLY_PATHS = ["/login", "/register", "/forgot-password"];
 
 function matchesPath(pathname: string, paths: string[]): boolean {
