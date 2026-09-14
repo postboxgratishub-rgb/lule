@@ -51,6 +51,44 @@ export interface AdminOverview {
   students_by_school: SchoolDistributionPoint[];
 }
 
+export type VideoSourceType = "external_url" | "cloudflare_stream" | "mux";
+
+export interface ChallengeDay {
+  id: string;
+  day_number: number;
+  title: string;
+  description: string | null;
+  release_date: string | null;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Video {
+  id: string;
+  challenge_day_id: string;
+  video_number: number;
+  title: string;
+  description: string | null;
+  duration_seconds: number;
+  thumbnail_url: string | null;
+  video_source_type: VideoSourceType;
+  video_url: string | null;
+  playback_id: string | null;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChallengeDayWithVideos extends ChallengeDay {
+  videos: Video[];
+}
+
+export interface ChallengeDaySummary extends ChallengeDay {
+  video_count: number;
+  published_video_count: number;
+}
+
 export interface AdminIdentity {
   id: string;
   email: string;

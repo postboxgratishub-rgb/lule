@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, School, UsersRound } from "lucide-react";
+import { Clapperboard, LayoutDashboard, School, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,6 +8,7 @@ const items = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/schools", label: "Schools", icon: School },
   { href: "/students", label: "Students", icon: UsersRound },
+  { href: "/content", label: "Challenge content", icon: Clapperboard },
 ];
 
 export function Navigation({ mobile = false }: { mobile?: boolean }) {
