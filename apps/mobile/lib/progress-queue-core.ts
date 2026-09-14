@@ -20,6 +20,19 @@ export type HeartbeatItem = QueueBase & {
 
 export type QueuedProgressItem = StartItem | HeartbeatItem;
 
+export function terminalFailureAffectsTarget(
+  queue: QueuedProgressItem[],
+  failedSessionId: string,
+  targetId?: string,
+): boolean {
+  return Boolean(
+    targetId &&
+      queue.some(
+        (item) => item.id === targetId && item.sessionId === failedSessionId,
+      ),
+  );
+}
+
 export function isTerminalProgressQueueError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
 

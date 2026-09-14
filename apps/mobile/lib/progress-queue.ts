@@ -7,6 +7,7 @@ import {
 } from "../services/learning";
 import {
   isTerminalProgressQueueError,
+  terminalFailureAffectsTarget,
   type HeartbeatItem,
   type QueuedProgressItem,
   type StartItem,
@@ -83,9 +84,11 @@ async function deliver(item: QueuedProgressItem): Promise<ProgressSnapshot> {
 async function drainQueue(studentId: string, targetId?: string): Promise<{
   snapshot: ProgressSnapshot | null;
   remaining: QueuedProgressItem[];
+  targetError: Error | null;
 }> {
   let queue = await readQueue(studentId);
   let targetSnapshot: ProgressSnapshot | null = null;
+  let targetError: Error | null = null;
   const blockedSessions = new Set<string>();
   const attemptedItems = new Set<string>();
   let pendingWrites = 0;
@@ -116,6 +119,9 @@ async function drainQueue(studentId: string, targetId?: string): Promise<{
       pendingWrites += 1;
     } catch (error) {
       if (isTerminalProgressQueueError(error)) {
+        if (terminalFailureAffectsTarget(queue, item.sessionId, targetId)) {
+          targetError = error instanceof Error ? error : new Error(String(error));
+        }
         // A stale/invalid session can never recover. Remove that session only,
         // allowing every other video to continue synchronizing.
         queue = queue.filter((candidate) => candidate.sessionId !== item.sessionId);
@@ -128,14 +134,14 @@ async function drainQueue(studentId: string, targetId?: string): Promise<{
 
     if (pendingWrites >= 25 && !(await persist())) {
       const storedQueue = await readQueue(studentId).catch(() => queue);
-      return { snapshot: targetSnapshot, remaining: storedQueue };
+      return { snapshot: targetSnapshot, remaining: storedQueue, targetError };
     }
   }
   if (!(await persist())) {
     const storedQueue = await readQueue(studentId).catch(() => queue);
-    return { snapshot: targetSnapshot, remaining: storedQueue };
+    return { snapshot: targetSnapshot, remaining: storedQueue, targetError };
   }
-  return { snapshot: targetSnapshot, remaining: queue };
+  return { snapshot: targetSnapshot, remaining: queue, targetError };
 }
 
 async function appendAndDrain(item: QueuedProgressItem): Promise<{
@@ -146,6 +152,7 @@ async function appendAndDrain(item: QueuedProgressItem): Promise<{
   if (!queue.some((queued) => queued.id === item.id)) queue.push(item);
   await writeQueue(item.studentId, queue);
   const result = await drainQueue(item.studentId, item.id);
+  if (result.targetError) throw result.targetError;
   return {
     snapshot: result.snapshot,
     queued: result.remaining.some((queued) => queued.sessionId === item.sessionId),

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,9 @@ import {
 import { CenteredState, Notice, PrimaryButton } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { acceptedPlaybackDelta, completionState, formatPlayerTime, HEARTBEAT_INTERVAL_MS, splitHeartbeatSeconds } from "@/lib/playback-math";
+import { needsNewWatchSession, shouldFinalizeForAppState } from "@/lib/player-lifecycle";
 import { createClientSessionId, enqueueHeartbeat, enqueueSessionStart, flushPendingProgress } from "@/lib/progress-queue";
+import { isTerminalProgressQueueError } from "@/lib/progress-queue-core";
 import { supabase } from "@/lib/supabase";
 import { resolveVideoUri } from "@/lib/video-source";
 import { completeVideo, getDayContent, type LearningVideo, type ProgressSnapshot, type VideoProgress } from "@/services/learning";
@@ -99,6 +102,9 @@ function TrackedPlayer({
   const isPlayingRef = useRef(false);
   const sessionStarted = useRef(false);
   const sessionEnded = useRef(true);
+  const endingRequested = useRef(false);
+  const finalizationVersion = useRef(0);
+  const nativeFullscreen = useRef(false);
   const lifecycleOperation = useRef<Promise<unknown>>(Promise.resolve());
   const mounted = useRef(true);
   const videoView = useRef<VideoView>(null);
@@ -190,27 +196,72 @@ function TrackedPlayer({
       }
       return lastResult;
     } catch (error) {
+      const terminal = isTerminalProgressQueueError(error);
       // Storage failures happen before a segment is safely queued. Restore only
       // the unsaved media time so a later heartbeat can retry it without double
       // counting segments that were already persisted.
-      pendingWatched.current += Math.max(0, transferableSeconds - persistedSeconds);
-      if (isFinal) sessionEnded.current = false;
+      if (terminal) {
+        sessionStarted.current = false;
+        sessionEnded.current = true;
+      } else {
+        pendingWatched.current += Math.max(0, transferableSeconds - persistedSeconds);
+        if (isFinal) sessionEnded.current = false;
+      }
       if (mounted.current) {
-        setQueued(true);
+        setQueued(!terminal);
         setSyncError(error instanceof Error ? error.message : "Progress is waiting to sync.");
       }
-      return { snapshot: null, queued: true };
+      return { snapshot: null, queued: !terminal };
     }
   }, [acceptSnapshot, studentId, video.id]);
 
   const flush = useCallback((isFinal = false) => {
     const positionSeconds = Math.max(0, player.currentTime);
-    return scheduleLifecycle(() => performFlush(isFinal, positionSeconds));
+    if (!isFinal) {
+      return scheduleLifecycle(() => performFlush(false, positionSeconds));
+    }
+
+    const version = finalizationVersion.current + 1;
+    finalizationVersion.current = version;
+    endingRequested.current = true;
+    const operation = scheduleLifecycle(() => performFlush(true, positionSeconds));
+    return operation.then(
+      (result) => {
+        if (finalizationVersion.current === version) endingRequested.current = false;
+        return result;
+      },
+      (error) => {
+        if (finalizationVersion.current === version) endingRequested.current = false;
+        throw error;
+      },
+    );
   }, [performFlush, player, scheduleLifecycle]);
 
-  const startFreshSession = useCallback((positionSeconds: number) => {
+  const ensureSessionStarted = useCallback((positionSeconds: number) => {
     const normalizedPosition = Math.max(0, positionSeconds);
+    const finalizationAtRequest = finalizationVersion.current;
     return scheduleLifecycle(async () => {
+      // A newer finalization request means this Play/Fullscreen request became
+      // stale while it was waiting (for example, the app backgrounded). Do not
+      // create a session that would immediately be orphaned.
+      if (
+        endingRequested.current &&
+        finalizationVersion.current !== finalizationAtRequest
+      ) {
+        return EMPTY_PROGRESS_WRITE;
+      }
+      if (finalizationVersion.current === finalizationAtRequest) {
+        endingRequested.current = false;
+      }
+      if (
+        !needsNewWatchSession({
+          sessionStarted: sessionStarted.current,
+          sessionEnded: sessionEnded.current,
+          endingRequested: endingRequested.current,
+        })
+      ) {
+        return EMPTY_PROGRESS_WRITE;
+      }
       sessionId.current = createClientSessionId();
       sequence.current = 0;
       sessionStarted.current = true;
@@ -234,6 +285,26 @@ function TrackedPlayer({
       }
     });
   }, [acceptSnapshot, scheduleLifecycle, studentId, video.id]);
+
+  const reconcileFullscreenProgress = useCallback(() => {
+    const now = Date.now();
+    const nextPosition = Math.max(0, player.currentTime);
+    pendingWatched.current += acceptedPlaybackDelta({
+      previousPosition: lastPosition.current,
+      currentPosition: nextPosition,
+      elapsedWallSeconds: (now - lastTickAt.current) / 1000,
+    });
+    lastPosition.current = nextPosition;
+    lastTickAt.current = now;
+    isPlayingRef.current = player.playing;
+    if (mounted.current) setCurrentTime(nextPosition);
+  }, [player]);
+
+  const handleFullscreenExit = useCallback(() => {
+    reconcileFullscreenProgress();
+    nativeFullscreen.current = false;
+    void flush(false);
+  }, [flush, reconcileFullscreenProgress]);
 
   useEffect(() => {
     mounted.current = true;
@@ -281,7 +352,12 @@ function TrackedPlayer({
           .catch(() => {
             if (mounted.current) setQueued(true);
           });
-      } else {
+      } else if (
+        shouldFinalizeForAppState(
+          state,
+          Platform.OS === "android" && nativeFullscreen.current,
+        )
+      ) {
         player.pause();
         void flush(true);
       }
@@ -332,6 +408,9 @@ function TrackedPlayer({
   }, [studentId, threshold, video.id]);
 
   useEventListener(player, "timeUpdate", ({ currentTime: nextPosition }) => {
+    // Android suspends JavaScript in its native fullscreen Activity. Ignore any
+    // queued events until onFullscreenExit reconciles the full interval once.
+    if (Platform.OS === "android" && nativeFullscreen.current) return;
     const now = Date.now();
     const elapsedWallSeconds = (now - lastTickAt.current) / 1000;
     if (isPlayingRef.current) {
@@ -348,12 +427,16 @@ function TrackedPlayer({
 
   useEventListener(player, "playingChange", ({ isPlaying }) => {
     isPlayingRef.current = isPlaying;
+    if (Platform.OS === "android" && nativeFullscreen.current) return;
     lastTickAt.current = Date.now();
     lastPosition.current = player.currentTime;
     if (!isPlaying) void flush(false);
   });
 
-  useEventListener(player, "playToEnd", () => { void flush(true); });
+  useEventListener(player, "playToEnd", () => {
+    if (nativeFullscreen.current) reconcileFullscreenProgress();
+    void flush(true);
+  });
 
   const completion = useMutation({
     mutationFn: async () => {
@@ -412,14 +495,60 @@ function TrackedPlayer({
       setCurrentTime(position);
     }
     try {
-      if (!sessionStarted.current || sessionEnded.current) {
-        await startFreshSession(player.currentTime);
+      if (
+        needsNewWatchSession({
+          sessionStarted: sessionStarted.current,
+          sessionEnded: sessionEnded.current,
+          endingRequested: endingRequested.current,
+        })
+      ) {
+        await ensureSessionStarted(player.currentTime);
+      }
+      if (
+        !sessionStarted.current ||
+        sessionEnded.current ||
+        endingRequested.current
+      ) {
+        return;
       }
       setSyncError(null);
       player.play();
     } catch (error) {
-      setQueued(true);
+      setQueued(!isTerminalProgressQueueError(error));
       setSyncError(error instanceof Error ? error.message : "Playback progress could not be initialized.");
+    }
+  };
+
+  const enterNativeFullscreen = async () => {
+    try {
+      if (
+        needsNewWatchSession({
+          sessionStarted: sessionStarted.current,
+          sessionEnded: sessionEnded.current,
+          endingRequested: endingRequested.current,
+        })
+      ) {
+        await ensureSessionStarted(player.currentTime);
+      }
+      if (
+        !sessionStarted.current ||
+        sessionEnded.current ||
+        endingRequested.current
+      ) {
+        return;
+      }
+
+      setSyncError(null);
+      lastPosition.current = player.currentTime;
+      lastTickAt.current = Date.now();
+      // Set this before invoking the native method: Android backgrounds the
+      // React host as it opens FullscreenPlayerActivity.
+      nativeFullscreen.current = true;
+      await videoView.current?.enterFullscreen();
+    } catch (error) {
+      nativeFullscreen.current = false;
+      setQueued(!isTerminalProgressQueueError(error));
+      setSyncError(error instanceof Error ? error.message : "Fullscreen playback could not be initialized.");
     }
   };
 
@@ -450,7 +579,16 @@ function TrackedPlayer({
       </View>
 
       <View className="mt-5 overflow-hidden bg-black">
-        <VideoView ref={videoView} player={player} style={styles.video} nativeControls={false} contentFit="contain" fullscreenOptions={{ enable: true }} />
+        <VideoView
+          ref={videoView}
+          player={player}
+          style={styles.video}
+          nativeControls={false}
+          contentFit="contain"
+          fullscreenOptions={{ enable: true }}
+          onFullscreenEnter={() => { nativeFullscreen.current = true; }}
+          onFullscreenExit={handleFullscreenExit}
+        />
         {statusEvent.status === "loading" ? <View style={styles.playerOverlay}><ActivityIndicator color="white" size="large" /><Text className="mt-3 text-white">Loading video…</Text></View> : null}
         {statusEvent.status === "error" ? (
           <View style={styles.playerOverlay}>
@@ -497,7 +635,7 @@ function TrackedPlayer({
           <ControlButton label="+10" onPress={() => { player.seekBy(10); lastPosition.current = player.currentTime; }} />
           <ControlButton label={`${speed}×`} onPress={cycleSpeed} />
           <ControlButton label={volume === 0 ? "Muted" : `Vol ${Math.round(volume * 100)}%`} onPress={cycleVolume} />
-          <ControlButton label="Full" onPress={() => { void videoView.current?.enterFullscreen(); }} />
+          <ControlButton label="Full" onPress={() => { void enterNativeFullscreen(); }} />
         </View>
       </View>
 
