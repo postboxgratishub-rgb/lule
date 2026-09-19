@@ -31,7 +31,21 @@ describe("registrationSchema", () => {
 
 describe("schoolSchema", () => {
   it("normalizes school codes", () => {
-    const result = schoolSchema.parse({ name: "Demo School", code: "demo-01" });
+    const result = schoolSchema.parse({
+      name: "Demo School",
+      code: "demo-01",
+      blockName: " Parvathipuram ",
+    });
     expect(result.code).toBe("DEMO-01");
+    expect(result.blockName).toBe("Parvathipuram");
+  });
+
+  it("rejects block names longer than the database limit", () => {
+    const result = schoolSchema.safeParse({
+      name: "Demo School",
+      code: "demo-01",
+      blockName: "x".repeat(151),
+    });
+    expect(result.success).toBe(false);
   });
 });

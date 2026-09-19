@@ -4,10 +4,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Admin | 100 Days of Learning",
-    template: "%s | 100 Days Admin",
+    default: "LULE Admin",
+    template: "%s | LULE Admin",
   },
-  description: "Secure administration for the 100-Day Learning Challenge.",
+  description: "Secure administration for the LULE learning programme.",
   robots: { index: false, follow: false },
 };
 

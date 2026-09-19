@@ -12,6 +12,7 @@ function schoolInput(formData: FormData) {
     id: formData.get("id"),
     name: formData.get("name"),
     code: formData.get("code"),
+    block_name: formData.get("block_name"),
     address: formData.get("address"),
     city: formData.get("city"),
     state: formData.get("state"),
@@ -56,7 +57,7 @@ export async function saveSchoolAction(
   if (id) {
     const { data: existing, error: readError } = await supabase
       .from("schools")
-      .select("name, code, address, city, state, contact_name, contact_phone")
+      .select("name, code, block_name, address, city, state, contact_name, contact_phone")
       .eq("id", id)
       .maybeSingle();
 

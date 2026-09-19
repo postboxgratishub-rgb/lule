@@ -9,9 +9,9 @@ management, video playback, and synchronized learning progress.
 
 | Surface | Available capabilities |
 | --- | --- |
-| Expo mobile | Student auth, profile, 100-day roadmap, released day/video screens, native video player, resume, completion, offline progress retry, Realtime refresh |
-| Student web | Student auth/profile, released challenge catalogue, custom responsive player, HLS/direct playback, resume, completion, browser progress queue, Realtime refresh |
-| Admin web | Admin auth/dashboard, school and student operations, challenge-day publishing, ten-slot video editor, source selection, video publishing/reordering/deletion |
+| Expo mobile | LULE-branded student auth, searchable 419-school directory, profile, 100-day roadmap, released day/video screens, native video player, resume, completion, offline progress retry, Realtime refresh |
+| Student web | LULE-branded student auth/profile, block-grouped school registration, released challenge catalogue, custom responsive player, HLS/direct playback, resume, completion, browser progress queue, Realtime refresh |
+| Admin web | LULE branding, admin auth/dashboard, school and student operations, block-aware directory search, challenge-day publishing, ten-slot video editor, source selection, video publishing/reordering/deletion |
 | Supabase | Auth profile trigger, content and progress schema, RLS/grants, server-authoritative playback RPCs, daily aggregation, audit log, Realtime publication |
 | Shared packages | Domain/database contracts, validation schemas, defaults, and framework-neutral helpers |
 
@@ -94,9 +94,11 @@ After `npx supabase db reset`:
 | Admin | `admin@example.com` | `Admin123!` |
 | Student | `student01@example.com` through `student10@example.com` | `Student123!` |
 
-These identities are local test data only. The seed also creates three schools,
-three complete challenge days with ten playable videos each, and varied sample
-progress. Never apply these credentials or rows to an internet-accessible project.
+These identities are local test data only. The seed also creates three sample
+schools, while the migrations load the 419-school AY 2026-27 UDISE directory.
+The seed adds three complete challenge days with ten playable videos each and
+varied sample progress. Never apply the seed credentials or sample rows to an
+internet-accessible project.
 
 ## Content workflow
 

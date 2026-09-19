@@ -5,6 +5,8 @@ The schema is built in order by:
 1. [`20260913000000_phase1_foundation.sql`](../supabase/migrations/20260913000000_phase1_foundation.sql)
 2. [`20260914000000_phase2_content_phase3_video.sql`](../supabase/migrations/20260914000000_phase2_content_phase3_video.sql)
 3. [`20260914183000_optimize_content_progress_refresh.sql`](../supabase/migrations/20260914183000_optimize_content_progress_refresh.sql)
+4. [`20260919000000_add_school_block_name.sql`](../supabase/migrations/20260919000000_add_school_block_name.sql)
+5. [`20260919010000_import_ay2026_school_directory.sql`](../supabase/migrations/20260919010000_import_ay2026_school_directory.sql)
 
 All timestamps are `timestamptz` and stored in UTC. Programme-date decisions use
 the timezone in the singleton `challenge_settings` row, which defaults to
@@ -14,10 +16,13 @@ the timezone in the singleton `challenge_settings` row, which defaults to
 
 ### `schools`
 
-Stores the enrollment directory and school contact details. `code` is unique and
-normalized to uppercase. Authenticated users may read schools; anonymous
-registration receives column-level access only to safe directory fields. Only
-administrators may mutate rows.
+Stores the enrollment directory and school contact details. `code` is the unique
+school identity and is normalized to uppercase; the AY 2026-27 import uses the
+11-digit UDISE code. `block_name` supports grouping and searching the 419 imported
+schools across 12 administrative blocks. Authenticated users may read schools;
+anonymous registration receives column-level access only to safe directory
+fields. Only administrators may mutate rows. The import is idempotent: it updates
+only changed names/blocks for an existing code and preserves IDs and contact data.
 
 ### `profiles`
 

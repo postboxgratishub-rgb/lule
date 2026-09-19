@@ -103,6 +103,7 @@ export default async function ProfilePage() {
             <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Detail label="School" value={school?.name ?? null} />
               <Detail label="School code" value={school?.code ?? null} />
+              <Detail label="Block" value={school?.block_name ?? null} />
               <Detail
                 label="Location"
                 value={[school?.city, school?.state].filter(Boolean).join(", ") || null}

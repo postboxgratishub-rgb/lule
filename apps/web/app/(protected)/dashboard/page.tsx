@@ -135,7 +135,11 @@ export default async function DashboardPage() {
           <StatCard
             eyebrow="School"
             value={school?.code ?? "—"}
-            detail={school?.name ?? "School details are not available."}
+            detail={
+              school
+                ? [school.name, school.block_name].filter(Boolean).join(" · ")
+                : "School details are not available."
+            }
             icon={<span aria-hidden="true">⌂</span>}
           />
         </div>

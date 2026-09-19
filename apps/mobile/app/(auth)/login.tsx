@@ -1,6 +1,7 @@
 import { Link, Redirect, router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { BrandLogo } from "@/components/brand-logo";
 import { Field, Notice, PrimaryButton } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -33,6 +34,9 @@ export default function LoginScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1 bg-slate-50">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="flex-grow justify-center px-6 py-12">
         <View className="mx-auto w-full max-w-md">
+          <View className="mb-8 items-center">
+            <BrandLogo />
+          </View>
           <View className="mb-9">
             <Text className="text-sm font-bold uppercase tracking-[3px] text-brand-700">100 days</Text>
             <Text className="mt-3 text-4xl font-black tracking-tight text-slate-950">Welcome back</Text>

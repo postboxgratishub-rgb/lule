@@ -31,7 +31,7 @@ export default async function StudentsPage({ searchParams }: StudentsPageProps) 
   let studentsQuery = supabase
     .from("profiles")
     .select(
-      "id, auth_user_id, full_name, email, phone, role, school_id, class_name, section, roll_number, date_of_birth, avatar_url, created_at, updated_at, school:schools!profiles_school_id_fkey(id, name, code)",
+      "id, auth_user_id, full_name, email, phone, role, school_id, class_name, section, roll_number, date_of_birth, avatar_url, created_at, updated_at, school:schools!profiles_school_id_fkey(id, name, code, block_name)",
       { count: "exact" },
     )
     .eq("role", "student")
@@ -47,7 +47,11 @@ export default async function StudentsPage({ searchParams }: StudentsPageProps) 
 
   const [studentsResult, schoolsResult] = await Promise.all([
     studentsQuery,
-    supabase.from("schools").select("id, name, code").order("name"),
+    supabase
+      .from("schools")
+      .select("id, name, code, block_name")
+      .order("block_name", { ascending: true, nullsFirst: false })
+      .order("name"),
   ]);
 
   if (studentsResult.error || schoolsResult.error) {
@@ -98,6 +102,7 @@ export default async function StudentsPage({ searchParams }: StudentsPageProps) 
                 {(schoolsResult.data ?? []).map((school) => (
                   <option key={school.id} value={school.id}>
                     {school.name}
+                    {school.block_name ? ` — ${school.block_name}` : ""}
                   </option>
                 ))}
               </select>
@@ -138,7 +143,16 @@ export default async function StudentsPage({ searchParams }: StudentsPageProps) 
                       </div>
                     </td>
                     <td className="table-cell text-ink-700">
-                      {student.school?.name ?? (
+                      {student.school ? (
+                        <>
+                          <span className="block">{student.school.name}</span>
+                          {student.school.block_name ? (
+                            <span className="mt-0.5 block text-xs text-ink-500">
+                              {student.school.block_name} block
+                            </span>
+                          ) : null}
+                        </>
+                      ) : (
                         <span className="text-amber-700">Not assigned</span>
                       )}
                     </td>

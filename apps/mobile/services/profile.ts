@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import type { SchoolDirectoryEntry } from "@/lib/school-directory";
 
 export type StudentProfile = {
   id: string;
@@ -13,21 +14,20 @@ export type StudentProfile = {
   roll_number: string | null;
   date_of_birth: string | null;
   avatar_url: string | null;
-  school: { id: string; name: string; code: string } | null;
+  school: {
+    id: string;
+    name: string;
+    code: string;
+    block_name: string | null;
+  } | null;
 };
 
-export type PublicSchool = {
-  id: string;
-  name: string;
-  code: string;
-  city: string | null;
-  state: string | null;
-};
+export type PublicSchool = SchoolDirectoryEntry;
 
 export async function getMyProfile(authUserId: string): Promise<StudentProfile> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id,auth_user_id,full_name,email,phone,role,school_id,class_name,section,roll_number,date_of_birth,avatar_url,school:schools(id,name,code)")
+    .select("id,auth_user_id,full_name,email,phone,role,school_id,class_name,section,roll_number,date_of_birth,avatar_url,school:schools(id,name,code,block_name)")
     .eq("auth_user_id", authUserId)
     .single();
 
@@ -38,8 +38,10 @@ export async function getMyProfile(authUserId: string): Promise<StudentProfile> 
 export async function getSchools(): Promise<PublicSchool[]> {
   const { data, error } = await supabase
     .from("schools")
-    .select("id,name,code,city,state")
-    .order("name");
+    .select("id,name,code,block_name,city,state")
+    .order("block_name", { ascending: true, nullsFirst: false })
+    .order("name")
+    .range(0, 999);
 
   if (error) throw error;
   return (data ?? []) as PublicSchool[];

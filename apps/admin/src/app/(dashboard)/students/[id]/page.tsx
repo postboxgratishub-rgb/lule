@@ -23,12 +23,16 @@ export default async function StudentProfilePage({
     supabase
       .from("profiles")
       .select(
-        "id, auth_user_id, full_name, email, phone, role, school_id, class_name, section, roll_number, date_of_birth, avatar_url, created_at, updated_at, school:schools!profiles_school_id_fkey(id, name, code)",
+        "id, auth_user_id, full_name, email, phone, role, school_id, class_name, section, roll_number, date_of_birth, avatar_url, created_at, updated_at, school:schools!profiles_school_id_fkey(id, name, code, block_name)",
       )
       .eq("id", id)
       .eq("role", "student")
       .maybeSingle(),
-    supabase.from("schools").select("id, name, code").order("name"),
+    supabase
+      .from("schools")
+      .select("id, name, code, block_name")
+      .order("block_name", { ascending: true, nullsFirst: false })
+      .order("name"),
   ]);
 
   if (studentResult.error || !studentResult.data) notFound();
@@ -75,6 +79,11 @@ export default async function StudentProfilePage({
               <div>
                 <dt className="text-xs font-semibold text-ink-500">School</dt>
                 <dd className="mt-1 text-ink-900">{student.school?.name ?? "Not assigned"}</dd>
+                {student.school?.block_name ? (
+                  <dd className="mt-1 text-xs text-ink-500">
+                    {student.school.block_name} block
+                  </dd>
+                ) : null}
               </div>
             </div>
             <div className="flex gap-3">

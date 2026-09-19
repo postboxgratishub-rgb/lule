@@ -69,6 +69,28 @@ export function SchoolForm({ school }: { school?: School }) {
         </div>
       </div>
       <div>
+        <label className="field-label" htmlFor="school-block-name">
+          Block name
+        </label>
+        <input
+          className="field-input"
+          id="school-block-name"
+          name="block_name"
+          defaultValue={school?.block_name ?? ""}
+          placeholder="e.g. Parvathipuram"
+          maxLength={150}
+          aria-invalid={fieldError("block_name") ? true : undefined}
+          aria-describedby={
+            fieldError("block_name") ? "school-block-name-error" : undefined
+          }
+        />
+        {fieldError("block_name") && (
+          <p className="field-error" id="school-block-name-error">
+            {fieldError("block_name")}
+          </p>
+        )}
+      </div>
+      <div>
         <label className="field-label" htmlFor="school-address">
           Address
         </label>

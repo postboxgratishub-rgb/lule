@@ -14,6 +14,7 @@ interface SchoolOption {
   id: string;
   name: string;
   code: string;
+  block_name: string | null;
 }
 
 export function StudentProfileForm({
@@ -79,6 +80,7 @@ export function StudentProfileForm({
           {schools.map((school) => (
             <option key={school.id} value={school.id}>
               {school.name} ({school.code})
+              {school.block_name ? ` — ${school.block_name}` : ""}
             </option>
           ))}
         </select>

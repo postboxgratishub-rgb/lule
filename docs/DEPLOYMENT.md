@@ -21,10 +21,12 @@ npx supabase migration list --linked
 ```
 
 The push must include the Phase 1 foundation migration, the Phase 2/3
-content/progress migration, and the additive content-refresh optimization. The
-Phase 2/3 migration also configures the required Realtime publication. Do not run
-`seed.sql` in production: it contains deterministic local identities, sample
-content, and sample progress.
+content/progress migration, the additive content-refresh optimization, and the
+school block/directory migrations. The directory migration imports 419 AY 2026-27
+schools under their unique UDISE codes and is safe to rerun. The Phase 2/3
+migration also configures the required Realtime publication. Do not run `seed.sql`
+in production: it contains deterministic local identities, sample content, and
+sample progress.
 
 Create the first production administrator through a controlled operator workflow.
 The public registration path always creates a student, by design.

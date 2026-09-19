@@ -30,13 +30,17 @@ export default async function SchoolsPage({ searchParams }: SchoolsPageProps) {
   let query = supabase
     .from("schools")
     .select(
-      "id, name, code, address, city, state, contact_name, contact_phone, created_at, updated_at, profiles(count)",
+      "id, name, code, block_name, address, city, state, contact_name, contact_phone, created_at, updated_at, profiles(count)",
       { count: "exact" },
     )
     .order("name")
     .range(from, to);
 
-  if (search) query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
+  if (search) {
+    query = query.or(
+      `name.ilike.%${search}%,code.ilike.%${search}%,block_name.ilike.%${search}%`,
+    );
+  }
   const { data, count, error } = await query;
   if (error) throw new Error("Unable to load schools.");
 
@@ -44,6 +48,7 @@ export default async function SchoolsPage({ searchParams }: SchoolsPageProps) {
     id: school.id,
     name: school.name,
     code: school.code,
+    block_name: school.block_name,
     address: school.address,
     city: school.city,
     state: school.state,
@@ -99,7 +104,7 @@ export default async function SchoolsPage({ searchParams }: SchoolsPageProps) {
                 name="q"
                 defaultValue={search}
                 className="field-input min-h-10 py-2 pl-9"
-                placeholder="Name or code"
+                placeholder="Name, code or block"
               />
             </div>
             <button className="button-secondary" type="submit">
@@ -114,7 +119,7 @@ export default async function SchoolsPage({ searchParams }: SchoolsPageProps) {
               <thead className="bg-slate-50/80">
                 <tr className="text-[11px] font-bold uppercase tracking-wider text-ink-500">
                   <th className="table-cell">School</th>
-                  <th className="table-cell">Location</th>
+                  <th className="table-cell">Block / location</th>
                   <th className="table-cell">Contact</th>
                   <th className="table-cell text-right">Students</th>
                   <th className="table-cell text-right">Actions</th>
@@ -130,7 +135,10 @@ export default async function SchoolsPage({ searchParams }: SchoolsPageProps) {
                       </span>
                     </td>
                     <td className="table-cell text-ink-500">
-                      <span className="inline-flex items-center gap-1.5">
+                      <p className="font-semibold text-ink-700">
+                        {school.block_name ?? "Block not provided"}
+                      </p>
+                      <span className="mt-1 inline-flex items-center gap-1.5 text-xs">
                         <MapPin className="size-3.5" aria-hidden="true" />
                         {[school.city, school.state].filter(Boolean).join(", ") || "Not provided"}
                       </span>
@@ -170,7 +178,7 @@ export default async function SchoolsPage({ searchParams }: SchoolsPageProps) {
             title={search ? "No matching schools" : "No schools yet"}
             description={
               search
-                ? "Try another school name or code."
+                ? "Try another school name, code, or block."
                 : "Use the form above to add the first participating school."
             }
             action={

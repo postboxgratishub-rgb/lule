@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { CenteredState, Notice, PrimaryButton, StatCard } from "@/components/ui";
 import { buildDayTiles, type DayTile } from "@/lib/challenge-state";
 import { useAuth } from "@/lib/auth-context";
@@ -187,6 +188,9 @@ export default function DashboardScreen() {
       renderItem={({ item }) => <DayCard tile={item} />}
       ListHeaderComponent={
         <View className="mb-5">
+          <View className="mb-4">
+            <BrandLogo compact />
+          </View>
           <Text className="text-sm font-bold uppercase tracking-[3px] text-brand-700">
             {challenge.data.settings.organization_name}
           </Text>
@@ -218,7 +222,17 @@ export default function DashboardScreen() {
           <View className="mt-4 flex-row flex-wrap gap-3">
             <StatCard label="Open days" value={`${availableDays}`} detail="Published and released" />
             <StatCard label="Videos done" value={`${totalCompletedVideos}`} detail="Confirmed by the server" />
-            <StatCard label="School" value={profile.data.school?.code ?? "—"} detail={profile.data.school?.name ?? "Not linked"} />
+            <StatCard
+              label="School"
+              value={profile.data.school?.code ?? "—"}
+              detail={
+                profile.data.school
+                  ? [profile.data.school.name, profile.data.school.block_name]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "Not linked"
+              }
+            />
             <StatCard label="Class" value={profile.data.class_name ?? "—"} detail={profile.data.section ? `Section ${profile.data.section}` : "Not provided"} />
           </View>
 

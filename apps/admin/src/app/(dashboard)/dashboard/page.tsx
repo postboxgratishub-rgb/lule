@@ -118,7 +118,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         {student.full_name}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-ink-500">
-                        {student.school?.name ?? "School not assigned"}
+                        {student.school
+                          ? [student.school.name, student.school.block_name]
+                              .filter(Boolean)
+                              .join(" · ")
+                          : "School not assigned"}
                       </span>
                     </span>
                     <span className="hidden text-[11px] text-ink-500 sm:block xl:hidden 2xl:block">

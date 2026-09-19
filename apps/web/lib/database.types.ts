@@ -17,6 +17,7 @@ export type Database = {
           id: string;
           name: string;
           code: string;
+          block_name: string | null;
           address: string | null;
           city: string | null;
           state: string | null;
@@ -29,6 +30,7 @@ export type Database = {
           id?: string;
           name: string;
           code: string;
+          block_name?: string | null;
           address?: string | null;
           city?: string | null;
           state?: string | null;
@@ -41,6 +43,7 @@ export type Database = {
           id?: string;
           name?: string;
           code?: string;
+          block_name?: string | null;
           address?: string | null;
           city?: string | null;
           state?: string | null;

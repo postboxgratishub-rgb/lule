@@ -3,7 +3,9 @@ import { registrationSchema } from "@100-days/validation";
 import * as Linking from "expo-linking";
 import { Link, router } from "expo-router";
 import { useMemo, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { BrandLogo } from "@/components/brand-logo";
+import { SchoolPicker } from "@/components/school-picker";
 import { Field, Notice, PrimaryButton } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { getSchools } from "@/services/profile";
@@ -76,6 +78,9 @@ export default function RegisterScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1 bg-slate-50">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="px-6 py-12">
         <View className="mx-auto w-full max-w-md gap-5">
+          <View className="items-center">
+            <BrandLogo />
+          </View>
           <View><Text className="text-3xl font-black text-slate-950">Join the challenge</Text><Text className="mt-2 leading-6 text-slate-600">Your progress will stay synchronized across mobile and web.</Text></View>
           {error ? <Notice tone="error">{error}</Notice> : null}
           <Field label="Full name" value={form.fullName} onChangeText={update("fullName")} autoComplete="name" />
@@ -85,7 +90,11 @@ export default function RegisterScreen() {
           <View className="gap-2">
             <Text className="text-sm font-semibold text-slate-700">School</Text>
             {schools.isLoading ? <Text className="text-slate-500">Loading schools…</Text> : schools.isError ? <Notice tone="error">Could not load schools. Check your connection and retry.</Notice> : schools.data?.length ? (
-              <View className="gap-2">{schools.data.map((school) => <Pressable key={school.id} onPress={() => update("schoolId")(school.id)} className={`rounded-2xl border p-4 ${form.schoolId === school.id ? "border-brand-700 bg-brand-50" : "border-slate-200 bg-white"}`}><Text className="font-bold text-slate-900">{school.name}</Text><Text className="mt-1 text-sm text-slate-500">{school.code}{school.city ? ` · ${school.city}` : ""}</Text></Pressable>)}</View>
+              <SchoolPicker
+                schools={schools.data}
+                selectedId={form.schoolId}
+                onSelect={update("schoolId")}
+              />
             ) : <Notice>No schools are available yet. Ask an administrator to add your school.</Notice>}
           </View>
           <View className="flex-row gap-3"><View className="flex-1"><Field label="Class" value={form.className} onChangeText={update("className")} /></View><View className="flex-1"><Field label="Section" value={form.section} onChangeText={update("section")} /></View></View>

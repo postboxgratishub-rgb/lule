@@ -13,6 +13,7 @@ describe("school input validation", () => {
       id: null,
       name: "  Greenwood Public School ",
       code: " gps-01 ",
+      block_name: " Parvathipuram ",
       address: "",
       city: " Bengaluru ",
       state: "Karnataka",
@@ -23,6 +24,7 @@ describe("school input validation", () => {
     expect(parsed.name).toBe("Greenwood Public School");
     expect(parsed.id).toBeUndefined();
     expect(parsed.code).toBe("GPS-01");
+    expect(parsed.block_name).toBe("Parvathipuram");
     expect(parsed.address).toBeNull();
     expect(parsed.city).toBe("Bengaluru");
   });
@@ -32,6 +34,7 @@ describe("school input validation", () => {
       schoolFormSchema.safeParse({
         name: "Valid School",
         code: "ABC,or(id.eq.1)",
+        block_name: "",
         address: "",
         city: "",
         state: "",
@@ -48,6 +51,7 @@ describe("school input validation", () => {
         schoolFormSchema.safeParse({
           name: "Valid School",
           code,
+          block_name: "",
           address: "",
           city: "",
           state: "",
@@ -57,6 +61,21 @@ describe("school input validation", () => {
       ).toBe(false);
     },
   );
+
+  it("rejects a block name longer than 150 characters", () => {
+    expect(
+      schoolFormSchema.safeParse({
+        name: "Valid School",
+        code: "VALID",
+        block_name: "x".repeat(151),
+        address: "",
+        city: "",
+        state: "",
+        contact_name: "",
+        contact_phone: "",
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("student profile validation", () => {

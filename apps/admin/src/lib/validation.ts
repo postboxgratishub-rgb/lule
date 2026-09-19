@@ -47,6 +47,7 @@ export const schoolFormSchema = z.object({
       "Start with a letter or number, then use letters, numbers, hyphens, or underscores.",
     )
     .transform((value) => value.toUpperCase()),
+  block_name: optionalText(150),
   address: optionalText(500),
   city: optionalText(100),
   state: optionalText(100),

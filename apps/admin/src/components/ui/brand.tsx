@@ -1,24 +1,22 @@
+import Image from "next/image";
 import Link from "next/link";
-import { BookOpenCheck } from "lucide-react";
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <Link
       href="/dashboard"
-      className="inline-flex items-center gap-3 rounded-lg text-ink-950"
-      aria-label="100 Days admin home"
+      className="inline-flex items-center rounded-xl text-ink-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"
+      aria-label="LULE admin home"
     >
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-700 text-white shadow-sm">
-        <BookOpenCheck aria-hidden="true" size={21} strokeWidth={2.2} />
-      </span>
-      {!compact && (
-        <span className="leading-tight">
-          <span className="block text-sm font-extrabold tracking-tight">100 Days</span>
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-            Admin console
-          </span>
-        </span>
-      )}
+      <Image
+        src="/branding/lule-logo.png"
+        alt=""
+        width={1672}
+        height={941}
+        priority
+        className={compact ? "h-10 w-auto object-contain" : "h-16 w-auto object-contain"}
+        sizes={compact ? "72px" : "114px"}
+      />
     </Link>
   );
 }

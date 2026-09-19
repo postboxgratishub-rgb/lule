@@ -49,6 +49,7 @@ export const updatePasswordSchema = z.object({
 export const schoolSchema = z.object({
   name: requiredText("School name"),
   code: z.string().trim().min(2).max(30).regex(/^[A-Za-z0-9_-]+$/, "Use letters, numbers, - or _").transform((value) => value.toUpperCase()),
+  blockName: z.string().trim().max(150).optional().or(z.literal("")),
   address: z.string().trim().max(300).optional().or(z.literal("")),
   city: z.string().trim().max(80).optional().or(z.literal("")),
   state: z.string().trim().max(80).optional().or(z.literal("")),

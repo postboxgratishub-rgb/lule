@@ -4,6 +4,7 @@ export interface School {
   id: string;
   name: string;
   code: string;
+  block_name: string | null;
   address: string | null;
   city: string | null;
   state: string | null;
@@ -35,7 +36,7 @@ export interface Profile {
 }
 
 export interface ProfileWithSchool extends Profile {
-  school: Pick<School, "id" | "name" | "code"> | null;
+  school: Pick<School, "id" | "name" | "code" | "block_name"> | null;
 }
 
 export interface SchoolDistributionPoint {

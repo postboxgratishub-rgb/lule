@@ -5,12 +5,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "100 Days Learning",
-    template: "%s · 100 Days Learning",
+    default: "LULE — Let Us Learn English",
+    template: "%s · LULE",
   },
   description:
-    "A focused 100-day learning journey for students, connected across web and mobile.",
-  applicationName: "100 Days Learning",
+    "LULE's 100-day English learning journey, connected across web and mobile.",
+  applicationName: "LULE — Let Us Learn English",
 };
 
 export const viewport: Viewport = {

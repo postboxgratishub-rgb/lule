@@ -128,7 +128,7 @@ export async function getRecentStudents(limit = 6): Promise<ProfileWithSchool[]>
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, auth_user_id, full_name, email, phone, role, school_id, class_name, section, roll_number, date_of_birth, avatar_url, created_at, updated_at, school:schools!profiles_school_id_fkey(id, name, code)",
+      "id, auth_user_id, full_name, email, phone, role, school_id, class_name, section, roll_number, date_of_birth, avatar_url, created_at, updated_at, school:schools!profiles_school_id_fkey(id, name, code, block_name)",
     )
     .eq("role", "student")
     .order("created_at", { ascending: false })

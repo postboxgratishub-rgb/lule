@@ -9,6 +9,10 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField, SelectField } from "@/components/ui/form-field";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  groupSchoolsByBlock,
+  type SchoolDirectoryOption,
+} from "@/lib/schools";
 import { createClient } from "@/lib/supabase/client";
 import {
   normalizePhone,
@@ -19,18 +23,10 @@ import {
   zodFieldErrors,
 } from "@/lib/validation/errors";
 
-type SchoolOption = {
-  id: string;
-  name: string;
-  code: string;
-  city: string | null;
-  state: string | null;
-};
-
 type SchoolState =
-  | { status: "loading"; schools: SchoolOption[]; message: null }
-  | { status: "ready"; schools: SchoolOption[]; message: null }
-  | { status: "error"; schools: SchoolOption[]; message: string };
+  | { status: "loading"; schools: SchoolDirectoryOption[]; message: null }
+  | { status: "ready"; schools: SchoolDirectoryOption[]; message: null }
+  | { status: "error"; schools: SchoolDirectoryOption[]; message: string };
 
 export function RegisterForm() {
   const router = useRouter();
@@ -54,7 +50,8 @@ export function RegisterForm() {
         const supabase = createClient();
         const { data, error: schoolsError } = await supabase
           .from("schools")
-          .select("id,name,code,city,state")
+          .select("id,name,code,block_name,city,state")
+          .order("block_name", { ascending: true, nullsFirst: false })
           .order("name", { ascending: true });
 
         if (schoolsError) throw schoolsError;
@@ -282,11 +279,15 @@ export function RegisterForm() {
               ? "Loading schools…"
               : "Select your school"}
           </option>
-          {schoolState.schools.map((school) => (
-            <option key={school.id} value={school.id}>
-              {school.name} ({school.code})
-              {school.city ? ` · ${school.city}` : ""}
-            </option>
+          {groupSchoolsByBlock(schoolState.schools).map((group) => (
+            <optgroup key={group.blockName} label={group.blockName}>
+              {group.schools.map((school) => (
+                <option key={school.id} value={school.id}>
+                  {school.name} ({school.code})
+                  {school.city ? ` · ${school.city}` : ""}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </SelectField>
 
